@@ -1,78 +1,48 @@
-// server.js - Main server file for the MERN blog application
+import express from 'express';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import path from 'path'; // Needed for static file pathing
 
-// Import required modules
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const path = require('path');
-
-// Import routes
-const postRoutes = require('./routes/posts');
-const categoryRoutes = require('./routes/categories');
-const authRoutes = require('./routes/auth');
+import connectDB from './config/db.js';
+import postRoutes from './routes/postRoutes.js';      
+import categoryRoutes from './routes/categoryRoutes.js';
+import userRoutes from './routes/userRoutes.js';        // <-- NEW: Import User Routes
+import uploadRoutes from './routes/uploadRoutes.js';    // <-- NEW: Import Upload Routes
+import { notFound, errorHandler } from './middleware/errorMiddleware.js'; 
 
 // Load environment variables
-dotenv.config();
+dotenv.config(); 
 
-// Initialize Express app
+// Connect to database
+connectDB(); 
+
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// --- MIDDLEWARE ---
+app.use(express.json()); 
+app.use(cors()); 
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// --- API ROUTES ---
+app.get('/', (req, res) => {
+  res.send('API is running... 🚀');
+});
 
-// Log requests in development mode
-if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    console.log(`${req.method} ${req.url}`);
-    next();
-  });
-}
-
-// API routes
+// Use the imported routes
 app.use('/api/posts', postRoutes);
 app.use('/api/categories', categoryRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);      // <-- NEW: Use User Routes
+app.use('/api/upload', uploadRoutes);   // <-- NEW: Use Upload Routes
 
-// Root route
-app.get('/', (req, res) => {
-  res.send('MERN Blog API is running');
-});
+// --- STATIC FOLDER (for images) ---
+// Note: This is required to serve images stored locally by Multer
+const __dirname = path.resolve(); // Gets the current directory path
+app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.statusCode || 500).json({
-    success: false,
-    error: err.message || 'Server Error',
-  });
-});
+// --- ERROR HANDLER MIDDLEWARE (must be last) ---
+app.use(notFound);
+app.use(errorHandler);
 
-// Connect to MongoDB and start server
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('Connected to MongoDB');
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('Failed to connect to MongoDB', err);
-    process.exit(1);
-  });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Promise Rejection:', err);
-  // Close server & exit process
-  process.exit(1);
-});
+const PORT = process.env.PORT || 5000;
 
-module.exports = app; 
+app.listen(PORT, () => console.log(`Server running on port ${PORT} 🌐`));
